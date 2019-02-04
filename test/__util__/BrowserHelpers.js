@@ -51,14 +51,18 @@ BrowserHelpers.prototype = {
         this.triggerMouseEvent(el, "mousemove");
     },
 
-    mount: function(templatePath, input) {
+    mount: function(templatePath, input, isLegacy) {
         var $global = input && input.$global;
         var template = require(templatePath);
         var renderResult = template.renderSync(input).appendTo(this.targetEl);
         var instance;
 
         try {
-            instance = renderResult.getComponent();
+            if (isLegacy) {
+                instance = renderResult.getWidget();
+            } else {
+                instance = renderResult.getComponent();
+            }
         } catch (e) {
             if (e.toString().indexOf("No component") === -1) {
                 throw e;
