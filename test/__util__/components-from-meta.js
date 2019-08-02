@@ -6,10 +6,14 @@ const getComponents = (module.exports = (template, components) => {
     if (meta) {
         if (!components[meta.id]) {
             if (meta.id && meta.component) {
-                components[meta.id] = path.resolve(
-                    path.dirname(template.path),
-                    meta.component
-                );
+                if (meta.component[0] === ".") {
+                    components[meta.id] = path.resolve(
+                        path.dirname(template.path),
+                        meta.component
+                    );
+                } else {
+                    components[meta.id] = meta.component;
+                }
             }
             if (meta.tags) {
                 meta.tags.forEach(tagRelativePath => {

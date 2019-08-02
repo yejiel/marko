@@ -1,7 +1,8 @@
 "use strict";
 var complain = "MARKO_DEBUG" && require("complain");
-var isClientReorderSupported = require("./client-reorder").isSupported;
 var AsyncValue = require("./AsyncValue");
+
+var FLAG_WILL_RERENDER_IN_BROWSER = 1;
 
 function safeRenderBody(renderBody, targetOut, data) {
     try {
@@ -72,8 +73,12 @@ function requestData(provider, timeout) {
 const LAST_OPTIONS = { last: true, name: "await:finish" };
 
 module.exports = function awaitTag(input, out) {
-    var clientReorder =
-        isClientReorderSupported && input.clientReorder === true && !out.isVDOM;
+    var clientReorder = input.clientReorder === true;
+    var ownerComponentDef = out.___assignedComponentDef;
+    var willHydrate =
+        ownerComponentDef &&
+        ownerComponentDef.___flags & FLAG_WILL_RERENDER_IN_BROWSER;
+    var key = out.___assignedKey;
 
     var name = input.name || input._name;
     var timeout = input.timeout;
@@ -176,8 +181,13 @@ module.exports = function awaitTag(input, out) {
             out.emit("await:beforeRender", awaitInfo);
         }
 
+        var state;
+
         if (err) {
             if (errorRenderer) {
+                if (willHydrate) {
+                    state = { rejected: true, error: err };
+                }
                 errorRenderer(asyncOut, err);
             } else {
                 asyncOut.error(err);
@@ -193,7 +203,20 @@ module.exports = function awaitTag(input, out) {
                 if (renderBodyErr) {
                     return renderBody(renderBodyErr);
                 }
+
+                if (willHydrate) {
+                    state = { resolved: true, data };
+                }
             }
+        }
+
+        if (willHydrate) {
+            var id = ownerComponentDef.id + "-" + key;
+            asyncOut.write(
+                `<script>window.$AR=window.$AR ||{};window.$AR[${JSON.stringify(
+                    id
+                )}]=${JSON.stringify(state)};</script>`
+            );
         }
 
         awaitInfo.finished = true;

@@ -1,0 +1,13 @@
+$ const namePromise = new Promise(resolve => setTimeout(() => resolve("Marko"), 10));
+
+<await(namePromise)>
+  <@then|name|>
+    Hello ${name}!
+  </@then>
+  <@catch|err|>
+    ${err.message}
+  </@catch>
+  <@placeholder>
+    Loading...
+  </@placeholder>
+</await>

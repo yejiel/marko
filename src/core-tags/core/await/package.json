@@ -1,6 +1,6 @@
 {
     "browser": {
-        "./client-reorder.js": "./client-reorder-browser.js",
+        "./renderer.js": "./component.marko",
         "./reorderer-renderer.js": "./noop-render.js"
     }
 }

@@ -1,0 +1,11 @@
+<await(input.namePromise)>
+  <@then|name|>
+    Hello ${name}!
+  </@then>
+  <@catch|err|>
+    ${err.message}
+  </@catch>
+  <@placeholder>
+    Loading...
+  </@placeholder>
+</await>

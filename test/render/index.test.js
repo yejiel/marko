@@ -109,6 +109,30 @@ async function runRenderTest(fixture) {
                 main.noFlushComment,
                 isVDOM
             );
+            let asyncDelay;
+
+            if (isVDOM) {
+                let awaitCount = 0;
+                let inc = () => ++awaitCount;
+                let dec = () => --awaitCount;
+                let events = browser.require(
+                    "../../src/core-tags/core/await/component.marko"
+                ).events;
+                events.on("await:begin", inc);
+                events.on("await:finish", dec);
+                asyncDelay = () => {
+                    if (awaitCount > 0) {
+                        events.removeListener("await:finish", dec);
+                        return new Promise(resolve => {
+                            events.on("await:finish", () => {
+                                if (!dec()) {
+                                    setTimeout(resolve, 10);
+                                }
+                            });
+                        });
+                    }
+                };
+            }
 
             template.render(templateData, out).end();
 
@@ -120,6 +144,8 @@ async function runRenderTest(fixture) {
                 } else {
                     (await out).replaceChildrenOf(actualNode);
                 }
+
+                await asyncDelay();
 
                 actualNode.normalize();
                 let vdomString = domToString(actualNode, {
