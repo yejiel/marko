@@ -5,9 +5,9 @@ var changeCase = require("./_change-case");
 var ComponentsContext = require("../components/ComponentsContext");
 var getComponentsContext = ComponentsContext.___getComponentsContext;
 var ComponentDef = require("../components/ComponentDef");
-var w10NOOP = require("warp10/constants").NOOP;
+var serializedNOOP = require("valav/deserialize").NOOP;
 var RENDER_BODY_TO_JSON = function() {
-  return w10NOOP;
+  return serializedNOOP;
 };
 
 var autoKeyReg = /^\d[\d[\]]*$/;
@@ -103,7 +103,7 @@ module.exports = function dynamicTag(
         if (isFn) {
           var flags = componentDef ? componentDef.___flags : 0;
           var willRerender = flags & FLAG_WILL_RERENDER_IN_BROWSER;
-          var isW10NOOP = render === w10NOOP;
+          var isW10NOOP = render === serializedNOOP;
           var preserve = IS_SERVER ? willRerender : isW10NOOP;
           out.___beginFragment(key, component, preserve);
           if (!isW10NOOP && isFn) {

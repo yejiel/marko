@@ -1,5 +1,5 @@
 "use strict";
-var warp10Finalize = require("warp10/finalize");
+var Deserializer = require("valav/deserialize");
 var eventDelegation = require("./event-delegation");
 var win = window;
 var defaultDocument = document;
@@ -17,6 +17,7 @@ var componentsByDOMNode = domData.___componentByDOMNode;
 var serverRenderedGlobals = {};
 var serverComponentRootNodes = {};
 
+var DEFAULT_RUNTIME_ID = "M";
 var FLAG_WILL_RERENDER_IN_BROWSER = 1;
 
 function indexServerComponentBoundaries(node, runtimeId, stack) {
@@ -247,47 +248,53 @@ function initClientRendered(componentDefs, doc) {
  * This method initializes all components that were rendered on the server by iterating over all
  * of the component IDs.
  */
-function initServerRendered(renderedComponents, doc) {
+function initServerRendered(renderedComponents, doc, deserializer) {
   var type = typeof renderedComponents;
-  var runtimeId;
+  var runtimeId, globalKey;
 
   if (type !== "object") {
-    var componentsKey =
-      "$" +
-      (type === "string" ? renderedComponents + "_components" : "components");
-    renderedComponents = win[componentsKey];
-
-    if (renderedComponents && renderedComponents.forEach) {
-      renderedComponents.forEach(function(renderedComponent) {
-        initServerRendered(renderedComponent, doc);
-      });
+    if (type === "string") {
+      runtimeId = renderedComponents;
+      globalKey = runtimeId + "_C";
+    } else {
+      globalKey = (runtimeId = DEFAULT_RUNTIME_ID) + "C";
     }
 
-    win[componentsKey] = {
+    deserializer = new Deserializer();
+    renderedComponents = win[globalKey];
+
+    if (renderedComponents) {
+      deserializer.write(renderedComponents);
+      
+      do {
+        var renderedComponent = deserializer.read();
+        initServerRendered(renderedComponent, doc, deserializer);
+      } while (renderedComponent);
+    }
+
+    win[globalKey] = {
       concat: initServerRendered
     };
 
     return;
+  } else {
+    runtimeId = renderedComponents.r || DEFAULT_RUNTIME_ID;
   }
 
   doc = doc || defaultDocument;
 
   renderedComponents = warp10Finalize(renderedComponents);
 
-  runtimeId = renderedComponents.r;
   var componentDefs = renderedComponents.w;
   var typesArray = renderedComponents.t;
-  var markoGlobalsKey = "$" + runtimeId + "G";
 
   // Ensure that event handlers to handle delegating events are
   // always attached before initializing any components
   indexServerComponentBoundaries(doc, runtimeId);
   eventDelegation.___init(doc);
 
-  var globals = win[markoGlobalsKey];
-  if (globals) {
-    serverRenderedGlobals = warp10Finalize(globals);
-    delete win[markoGlobalsKey];
+  if (!serverRenderedGlobals) {
+    serverRenderedGlobals = renderedComponents.g;
   }
 
   // hydrate components top down (leaf nodes last)

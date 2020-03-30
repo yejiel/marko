@@ -1,7 +1,10 @@
 "use strict";
 
-var warp10 = require("warp10");
-var safeJSONRegExp = /<\/|\u2028|\u2029/g;
+const Serializer = require("valav/serialize").default;
+const safeJSONRegExp = /<\/|\u2028|\u2029/g;
+const IGNORE_GLOBAL_TYPES = new Set(["undefined", "function", "symbol"]);
+
+// TODO: serialize widgetIdPrefix
 
 function safeJSONReplacer(match) {
   if (match === "</") {
@@ -11,8 +14,30 @@ function safeJSONReplacer(match) {
   }
 }
 
-function safeJSON(json) {
-  return json.replace(safeJSONRegExp, safeJSONReplacer);
+function safeStringify(data) {
+  return JSON.stringify(data).replace(safeJSONRegExp, safeJSONReplacer);
+}
+
+function getSerializedGlobals(outGlobal) {
+  let serializedGlobalsLookup = outGlobal.serializedGlobals;
+  if (serializedGlobalsLookup) {
+    let serializedGlobals;
+    let keys = Object.keys(serializedGlobalsLookup);
+    for (let i = keys.length; i--;) {
+      let key = keys[i];
+      if (serializedGlobalsLookup[key]) {
+        let value = outGlobal[key];
+        if (!IGNORE_GLOBAL_TYPES.has(typeof value)) {
+          if (serializedGlobals === undefined) {
+            serializedGlobals = {};
+          }
+          serializedGlobals[key] = value;
+        }
+      }
+    }
+
+    return serializedGlobals;
+  }
 }
 
 function addComponentsFromContext(componentsContext, componentsToHydrate) {
@@ -116,41 +141,44 @@ function addComponentsFromContext(componentsContext, componentsToHydrate) {
   }
 }
 
-function getInitComponentsData(componentDefs, runtimeId) {
+function getComponentsData(out, componentDefs) {
   let len;
   if ((len = componentDefs.length) === 0) {
     return;
   }
 
-  const typesLookup = {};
-  const componentTypes = [];
   const TYPE_INDEX = 1;
+  const $global = out.global;
+  const typesLookup =
+    $global.___typesLookup || ($global.___typesLookup = new Map());
+  const newTypes = [];
+
   for (let i = 0; i < len; i++) {
     const componentDef = componentDefs[i];
     const typeName = componentDef[TYPE_INDEX];
-    let typeIndex = typesLookup[typeName];
+    let typeIndex = typesLookup.get(typeName);
     if (typeIndex === undefined) {
-      typeIndex = componentTypes.length;
-      componentTypes.push(typeName);
-      typesLookup[typeName] = typeIndex;
+      typeIndex = typesLookup.size;
+      typesLookup.set(typeName, typeIndex);
+      newTypes.push(typeName);
     }
     componentDef[TYPE_INDEX] = typeIndex;
   }
-  return { r: runtimeId, w: componentDefs, t: componentTypes };
+
+  return { w: componentDefs, t: newTypes.length ? newTypes : undefined };
 }
 
 function getInitComponentsDataFromOut(out) {
-  var componentsContext = out.___components;
+  const componentsContext = out.___components;
 
   if (componentsContext === null) {
     return;
   }
 
-  var componentsToHydrate = [];
-
+  const componentsToHydrate = [];
   addComponentsFromContext(componentsContext, componentsToHydrate);
 
-  return getInitComponentsData(componentsToHydrate, out.global.runtimeId);
+  return getComponentsData(out, componentsToHydrate);
 }
 
 function writeInitComponentsCode(out) {
@@ -161,31 +189,32 @@ exports.___getInitComponentsCode = function getInitComponentsCode(
   out,
   componentDefs
 ) {
-  var runtimeId = out.global.runtimeId;
-  var initComponentsData;
+  const $global = out.global;
+  const serializer = $global.___serializer || ($global.___serializer = new Serializer());
 
-  if (arguments.length === 2) {
-    initComponentsData = getInitComponentsData(componentDefs, runtimeId);
-  } else {
-    initComponentsData = getInitComponentsDataFromOut(out);
-  }
+  const initComponentsData =
+    arguments.length === 2
+      ? getComponentsData(out, componentDefs)
+      : getInitComponentsDataFromOut(out);
 
   if (initComponentsData === undefined) {
     return "";
   }
 
-  var componentGlobalKey =
-    "$" + (runtimeId === "M" ? "components" : runtimeId + "_components");
+  const runtimeId = $global.runtimeId;
+  const componentGlobalKey = (runtimeId === "M" ? "MC" : runtimeId + "_MC");
 
-  return (
-    componentGlobalKey +
-    "=(window." +
-    componentGlobalKey +
-    "||[]).concat(" +
-    safeJSON(warp10.stringify(initComponentsData)) +
-    ")||" +
-    componentGlobalKey
-  );
+  if (!$global.___didSerializeComponents) {
+    $global.___didSerializeComponents = true;
+    initComponentsData.g = getSerializedGlobals($global);
+    serializer.write(initComponentsData);
+    return `$${componentGlobalKey}=${safeStringify(serializer.read())}`;
+  }
+
+  serializer.write(initComponentsData);
+  return `$${componentGlobalKey}=${componentGlobalKey}.concat(${safeStringify(
+    serializer.read()
+  )})`;
 };
 
 exports.___addComponentsFromContext = addComponentsFromContext;
@@ -199,6 +228,10 @@ exports.writeInitComponentsCode = writeInitComponentsCode;
  * @return {Object} An object with information about the rendered components that can be serialized to JSON. The object should be treated as opaque
  */
 exports.getRenderedComponents = function(out) {
-  var initComponentsData = getInitComponentsDataFromOut(out);
-  return warp10.stringifyPrepare(initComponentsData);
+  const $global = out.global;
+  if (!$global.___serializer) {
+    $global.___serializer = new Serializer();
+  }
+
+  return getInitComponentsDataFromOut(out);
 };

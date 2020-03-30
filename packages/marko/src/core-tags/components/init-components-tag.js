@@ -18,7 +18,12 @@ function addComponentsFromOut(source, target) {
 function addInitScript(writer) {
   const out = writer.state.root;
   const componentDefs = writer.get("componentDefs");
-  writer.script(getInitComponentsCode(out, componentDefs));
+  const initCode = getInitComponentsCode(out, componentDefs);
+
+  if (initCode) {
+    out.global.___didWriteInitCode = true;
+    writer.script(initCode);
+  }
 }
 
 function forceScriptTagAtThisPoint(out) {
@@ -29,9 +34,9 @@ function forceScriptTagAtThisPoint(out) {
 }
 
 module.exports = function render(input, out) {
-  const outGlobal = out.global;
-  if (outGlobal[INIT_COMPONENTS_KEY] === undefined) {
-    outGlobal[INIT_COMPONENTS_KEY] = true;
+  const $global = out.global;
+  if ($global[INIT_COMPONENTS_KEY] === undefined) {
+    $global[INIT_COMPONENTS_KEY] = true;
 
     out.on("await:finish", addComponentsFromOut);
     out.on("___toString", addInitScript);
@@ -54,6 +59,11 @@ module.exports = function render(input, out) {
         }
         // Write out all of the component init code from the main out
         addComponentsFromOut(rootOut, asyncOut);
+
+        if ($global.___didWriteInitCode) {
+          // TODO: signal that init code is finished
+        }
+
         forceScriptTagAtThisPoint(asyncOut);
         asyncOut.end();
         next();

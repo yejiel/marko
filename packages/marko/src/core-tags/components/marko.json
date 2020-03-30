@@ -95,6 +95,7 @@
   },
   "<component-globals>": {
     "renderer": "./component-globals-tag.js",
+    "deprecated": true,
     "no-output": true,
     "autocomplete": []
   },
