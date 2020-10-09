@@ -109,6 +109,8 @@ function VElement(
   this.___nodeName = tagName;
   this.___valueInternal = null;
   this.___constId = constId;
+  this.___preserve = false;
+  this.___preserveBody = false;
 }
 
 VElement.prototype = {

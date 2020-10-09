@@ -15,6 +15,7 @@ var registry = require("./registry");
 var domData = require("./dom-data");
 var keyedElementsByComponentId = domData.___ssrKeyedElementsByComponentId;
 var componentsByDOMNode = domData.___componentByDOMNode;
+var keyByDOMNode = domData.___keyByDOMNode;
 var serverComponentRootNodes = {};
 var serverRenderedMeta = {};
 

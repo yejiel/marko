@@ -4,11 +4,9 @@ function addPreserve(transformHelper, bodyOnly, condition) {
   let el = transformHelper.el;
   let context = transformHelper.context;
   let builder = transformHelper.builder;
-
-  let preserveAttrs = {};
+  var isCustomTag = el.type !== "HtmlElement";
 
   if (bodyOnly) {
-    preserveAttrs["body-only"] = builder.literal(bodyOnly);
     el.forEachChild(child => {
       child._canBePreserved = true;
     });
@@ -16,14 +14,23 @@ function addPreserve(transformHelper, bodyOnly, condition) {
     el._canBePreserved = true;
   }
 
-  if (condition) {
-    preserveAttrs["if"] = condition;
+  var preserveAttrs = {};
+
+  if (isCustomTag) {
+    preserveAttrs.key = builder.concat(builder.literal("p_"), transformHelper.assignComponentId().nestedIdExpression);
+  } else {
+    preserveAttrs.n = builder.literal(true);
+    preserveAttrs.key = transformHelper.assignComponentId().nestedIdExpression;
+
+    if (bodyOnly) {
+      preserveAttrs.b = builder.literal(true);
+    }
   }
 
-  preserveAttrs.key = builder.concat(
-    builder.literal("p_"),
-    transformHelper.assignComponentId().nestedIdExpression
-  );
+  if (condition) {
+    preserveAttrs.i = condition;
+  }
+
   let preserveNode = context.createNodeForEl("_preserve", preserveAttrs);
 
   if (bodyOnly) {
